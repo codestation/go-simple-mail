@@ -26,6 +26,7 @@ type Email struct {
 	parts       []part
 	attachments []*file
 	inlines     []*file
+	ReplaceCID  bool
 	Charset     string
 	Encoding    encoding
 	Error       error
@@ -131,9 +132,10 @@ const (
 // NewMSG creates a new email. It uses UTF-8 by default. All charsets: http://webcheatsheet.com/HTML/character_sets_list.php
 func NewMSG() *Email {
 	email := &Email{
-		headers:  make(textproto.MIMEHeader),
-		Charset:  "UTF-8",
-		Encoding: EncodingQuotedPrintable,
+		headers:    make(textproto.MIMEHeader),
+		Charset:    "UTF-8",
+		Encoding:   EncodingQuotedPrintable,
+		ReplaceCID: true,
 	}
 
 	email.AddHeader("MIME-Version", "1.0")
