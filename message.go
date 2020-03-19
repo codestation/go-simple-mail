@@ -14,22 +14,24 @@ import (
 )
 
 type message struct {
-	headers  textproto.MIMEHeader
-	body     *bytes.Buffer
-	writers  []*multipart.Writer
-	parts    uint8
-	cids     map[string]string
-	charset  string
-	encoding encoding
+	headers    textproto.MIMEHeader
+	body       *bytes.Buffer
+	writers    []*multipart.Writer
+	parts      uint8
+	cids       map[string]string
+	charset    string
+	encoding   encoding
+	replaceCID bool
 }
 
 func newMessage(email *Email) *message {
 	return &message{
-		headers:  email.headers,
-		body:     new(bytes.Buffer),
-		cids:     make(map[string]string),
-		charset:  email.Charset,
-		encoding: email.Encoding}
+		headers:    email.headers,
+		body:       new(bytes.Buffer),
+		cids:       make(map[string]string),
+		charset:    email.Charset,
+		replaceCID: email.ReplaceCID,
+		encoding:   email.Encoding}
 }
 
 func encodeHeader(text string, charset string, usedChars int) string {
@@ -216,7 +218,9 @@ func (msg *message) writeBody(body []byte, encoding encoding) {
 }
 
 func (msg *message) addBody(contentType string, body []byte) {
-	body = []byte(msg.replaceCIDs(string(body)))
+	if msg.replaceCID && contentType == "text/html" {
+		body = []byte(msg.replaceCIDs(string(body)))
+	}
 
 	header := make(textproto.MIMEHeader)
 	header.Set("Content-Type", contentType+"; charset="+msg.charset)
