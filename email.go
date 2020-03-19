@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime"
 	"net"
@@ -66,6 +67,7 @@ type file struct {
 	filename string
 	mimeType string
 	data     []byte
+	cid      string
 }
 
 type encryption int
@@ -521,6 +523,50 @@ func (email *Email) AddAttachmentBase64(b64File string, name string) *Email {
 	return email
 }
 
+// AddAttachmentBase64 allows you to add an attachment from a reader to the email message.
+// You can optionally provide a CID
+func (email *Email) AddAttachmentReader(r io.Reader, name string, cid ...string) *Email {
+	if email.Error != nil {
+		return email
+	}
+
+	if len(cid) > 1 {
+		email.Error = errors.New("Mail Error: Attach Reader can only have a single CID")
+		return email
+	}
+
+	var fileCID string
+	if len(cid) == 1 {
+		fileCID = cid[0]
+	}
+
+	email.Error = email.attachReader(r, name, false, fileCID)
+
+	return email
+}
+
+// AddAttachmentBase64 allows you to add an attachment from a reader to the email message.
+// You can optionally provide a CID
+func (email *Email) AddInlineReader(r io.Reader, name string, cid ...string) *Email {
+	if email.Error != nil {
+		return email
+	}
+
+	if len(cid) > 1 {
+		email.Error = errors.New("Mail Error: Inline Reader can only have single CID")
+		return email
+	}
+
+	var fileCID string
+	if len(cid) == 1 {
+		fileCID = cid[0]
+	}
+
+	email.Error = email.attachReader(r, name, true, fileCID)
+
+	return email
+}
+
 // AddInline allows you to add an inline attachment to the email message.
 // You can optionally provide a different name for the file.
 func (email *Email) AddInline(file string, name ...string) *Email {
@@ -597,6 +643,40 @@ func (email *Email) attachB64(b64File string, name string) error {
 		mimeType: mimeType,
 		data:     dec,
 	})
+
+	return nil
+}
+
+// attachB64 does the low level attaching of the files from a reader
+func (email *Email) attachReader(r io.Reader, name string, inline bool, cid string) error {
+
+	// read the attachment
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return errors.New("Mail Error: Failed read attachment with following error: " + err.Error())
+	}
+
+	// get the file mime type
+	mimeType := mime.TypeByExtension(name)
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+
+	if inline {
+		email.inlines = append(email.attachments, &file{
+			filename: name,
+			mimeType: mimeType,
+			data:     data,
+			cid:      cid,
+		})
+	} else {
+		email.attachments = append(email.attachments, &file{
+			filename: name,
+			mimeType: mimeType,
+			data:     data,
+			cid:      cid,
+		})
+	}
 
 	return nil
 }
