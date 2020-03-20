@@ -161,6 +161,10 @@ func (email *Email) GetError() error {
 	return email.Error
 }
 
+func (email *Email) GetFrom() string {
+	return email.from
+}
+
 // SetFrom sets the From address.
 func (email *Email) SetFrom(address string) *Email {
 	if email.Error != nil {
