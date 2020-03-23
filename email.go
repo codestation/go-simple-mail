@@ -396,6 +396,17 @@ func (email *Email) SetDate(dateTime string) *Email {
 	return email
 }
 
+// SetDate sets the date header to the provided date/time.
+func (email *Email) SetDateFromTime(date time.Time) *Email {
+	if email.Error != nil {
+		return email
+	}
+
+	email.headers.Set("Date", date.Format(time.RFC1123Z))
+
+	return email
+}
+
 // SetSubject sets the subject of the email message.
 func (email *Email) SetSubject(subject string) *Email {
 	if email.Error != nil {
