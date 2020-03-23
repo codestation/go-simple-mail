@@ -724,7 +724,7 @@ func smtpConnect(host string, port string, a auth, encryption encryption, config
 	// send Hello
 	if err = c.hi("localhost"); err != nil {
 		c.close()
-		return nil, errors.New("Mail Error on Hello: " + err.Error())
+		return nil, fmt.Errorf("Mail Error on Hello: %w", err)
 	}
 
 	// start TLS if necessary
@@ -736,7 +736,7 @@ func smtpConnect(host string, port string, a auth, encryption encryption, config
 
 			if err = c.startTLS(config); err != nil {
 				c.close()
-				return nil, errors.New("Mail Error on Start TLS: " + err.Error())
+				return nil, fmt.Errorf("Mail Error on Start TLS: %w", err)
 			}
 		}
 	}
@@ -746,7 +746,7 @@ func smtpConnect(host string, port string, a auth, encryption encryption, config
 		if ok, _ := c.extension("AUTH"); ok {
 			if err = c.authenticate(a); err != nil {
 				c.close()
-				return nil, errors.New("Mail Error on Auth: " + err.Error())
+				return nil, fmt.Errorf("Mail Error on Auth: %w", err)
 			}
 		}
 	}
