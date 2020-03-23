@@ -893,7 +893,7 @@ func (server *SMTPServer) Connect() (*SMTPClient, error) {
 		select {
 		case err = <-smtpConnectChannel:
 			if err != nil {
-				return nil, errors.New(err.Error())
+				return nil, err
 			}
 		case <-time.After(server.ConnectTimeout):
 			return nil, errors.New("Mail Error: SMTP Connection timed out")
