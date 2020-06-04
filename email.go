@@ -39,15 +39,16 @@ SMTPServer represents a SMTP Server
 If authentication is CRAM-MD5 then the Password is the Secret
 */
 type SMTPServer struct {
-	Authentication authType
-	Encryption     encryption
-	Username       string
-	Password       string
-	ConnectTimeout time.Duration
-	SendTimeout    time.Duration
-	Host           string
-	Port           int
-	KeepAlive      bool
+	Authentication     authType
+	Encryption         encryption
+	Username           string
+	Password           string
+	ConnectTimeout     time.Duration
+	SendTimeout        time.Duration
+	Host               string
+	Port               int
+	KeepAlive          bool
+	InsecureSkipVerify bool
 }
 
 //SMTPClient represents a SMTP Client for send email
@@ -828,7 +829,7 @@ func smtpConnect(host string, port string, a auth, encryption encryption, config
 	if encryption == EncryptionTLS {
 		if ok, _ := c.extension("STARTTLS"); ok {
 			if config.ServerName == "" {
-				config = &tls.Config{ServerName: host}
+				config.ServerName = host
 			}
 
 			if err = c.startTLS(config); err != nil {
@@ -879,7 +880,8 @@ func (server *SMTPServer) Connect() (*SMTPClient, error) {
 	if server.ConnectTimeout != 0 {
 		smtpConnectChannel = make(chan error, 2)
 		go func() {
-			c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, new(tls.Config))
+			tlsConfig := &tls.Config{InsecureSkipVerify: server.InsecureSkipVerify}
+			c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
 			// send the result
 			smtpConnectChannel <- err
 		}()
@@ -887,7 +889,8 @@ func (server *SMTPServer) Connect() (*SMTPClient, error) {
 
 	if server.ConnectTimeout == 0 {
 		// no ConnectTimeout, just fire the connect
-		c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, new(tls.Config))
+		tlsConfig := &tls.Config{InsecureSkipVerify: server.InsecureSkipVerify}
+		c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
 	} else {
 		// get the connect result or timeout result, which ever happens first
 		select {
