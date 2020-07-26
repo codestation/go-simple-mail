@@ -2,6 +2,7 @@ package mail
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"net/textproto"
 	"path/filepath"
 	"time"
+
+	tlsctx "github.com/xhit/go-simple-mail/v2/tls"
 )
 
 // Email represents an email message.
@@ -693,8 +696,9 @@ func (email *Email) Send(client *SMTPClient) error {
 }
 
 // dial connects to the smtp server with the request encryption type
-func dial(host string, port string, encryption encryption, config *tls.Config) (*smtpClient, error) {
+func dial(ctx context.Context, host string, port string, encryption encryption, config *tls.Config) (*smtpClient, error) {
 	var conn net.Conn
+	var dialer net.Dialer
 	var err error
 
 	address := host + ":" + port
@@ -702,9 +706,10 @@ func dial(host string, port string, encryption encryption, config *tls.Config) (
 	// do the actual dial
 	switch encryption {
 	case EncryptionSSL:
-		conn, err = tls.Dial("tcp", address, config)
+		d := tlsctx.Dialer{NetDialer: &dialer, Config: config}
+		conn, err = d.DialContext(ctx, "tcp", address)
 	default:
-		conn, err = net.Dial("tcp", address)
+		conn, err = dialer.DialContext(ctx, "tcp", address)
 	}
 
 	if err != nil {
@@ -722,9 +727,9 @@ func dial(host string, port string, encryption encryption, config *tls.Config) (
 
 // smtpConnect connects to the smtp server and starts TLS and passes auth
 // if necessary
-func smtpConnect(host string, port string, a auth, encryption encryption, config *tls.Config) (*smtpClient, error) {
+func smtpConnect(ctx context.Context, host string, port string, a auth, encryption encryption, config *tls.Config) (*smtpClient, error) {
 	// connect to the mail server
-	c, err := dial(host, port, encryption, config)
+	c, err := dial(ctx, host, port, encryption, config)
 
 	if err != nil {
 		return nil, err
@@ -761,6 +766,11 @@ func smtpConnect(host string, port string, a auth, encryption encryption, config
 
 //Connect returns the smtp client
 func (server *SMTPServer) Connect() (*SMTPClient, error) {
+	return server.ConnectContext(context.Background())
+}
+
+//Connect returns the smtp client
+func (server *SMTPServer) ConnectContext(ctx context.Context) (*SMTPClient, error) {
 
 	var a auth
 
@@ -792,7 +802,7 @@ func (server *SMTPServer) Connect() (*SMTPClient, error) {
 	if server.ConnectTimeout != 0 {
 		smtpConnectChannel = make(chan error, 2)
 		go func() {
-			c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
+			c, err = smtpConnect(ctx, server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
 			// send the result
 			smtpConnectChannel <- err
 		}()
@@ -802,12 +812,12 @@ func (server *SMTPServer) Connect() (*SMTPClient, error) {
 			if err != nil {
 				return nil, err
 			}
-		case <-time.After(server.ConnectTimeout):
-			return nil, errors.New("Mail Error: SMTP Connection timed out")
+		case <-ctx.Done():
+			return nil, fmt.Errorf("Mail Error: %s", ctx.Err())
 		}
 	} else {
 		// no ConnectTimeout, just fire the connect
-		c, err = smtpConnect(server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
+		c, err = smtpConnect(ctx, server.Host, fmt.Sprintf("%d", server.Port), a, server.Encryption, tlsConfig)
 		if err != nil {
 			return nil, err
 		}
